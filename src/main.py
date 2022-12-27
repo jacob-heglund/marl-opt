@@ -10,8 +10,6 @@ import pdb
 # initialize subtask controllers
 controller_dict = {}
 
-#TODO develop visualizations for the high-level policy
-
 """
 # scenario 1 - many nonlinear success functions
 # pushing the optimization to its limits (at least for our purposes anyways)
@@ -256,7 +254,6 @@ state_action_transition_dict[12] = {
     "final_states": [13]
     }
 
-#TODO visualize the graph with networkx to make sure I'm creating the right graph
 G = nx.DiGraph()
 edge_labels = {}
 
@@ -354,9 +351,6 @@ hlmdp = HLMDP(init_states=init_states, goal_states=final_states, controller_dict
 
 # this is just to show that the basic optimization works given the classes I have implemented
 # policy, reach_prob, feasible_flag = hlmdp.solve_max_reach_prob_policy()
-
-#TODO would be nice to visualize the policy for the high-level MDP
-## this isn't necessary at all, and will take some time. You need to prioritize the low-level RL stuff first.
 
 policy, optimal_comms_vals, chosen_success_probs, goal_reach_prob, feasible_flag = hlmdp.solve_minimal_comms_vals(prob_threshold)
 
