@@ -124,6 +124,97 @@ class HLMDP(object):
                     if self.successor[(sp, action)] == s:
                         self.predecessors[s].append((sp, action))
 
+    def solve_max_reach_prob_policy(self):
+        """
+        Find the meta-policy that maximizes probability of reaching the goal state.
+
+        Outputs
+        -------
+        policy : numpy (N_S, N_A) array
+            Array representing the solution policy. If there is no feasible solution, an array of
+            -1 is returned.
+        reach_prob : float
+            The probability of reaching the goal state under the policy.
+        feasible_flag : bool
+            Flag indicating whether or not a feasible solution was found.
+        """
+        self.update_transition_function()
+
+        #initialize gurobi model
+        linear_model = Model("abs_mdp_linear")
+
+        #dictionary for state action occupancy
+        state_act_vars={}
+
+        avail_actions = self.avail_actions.copy()
+
+        #dummy action for goal state
+        avail_actions[self.s_g]=[0]
+
+        #create occupancy measures, probability variables and reward variables
+        for s in self.S:
+            for a in avail_actions[s]:
+                state_act_vars[s,a]=linear_model.addVar(lb=0,name="state_act_"+str(s)+"_"+str(a))
+
+        #gurobi updates model
+        linear_model.update()
+
+        #MDP bellman or occupancy constraints for each state
+        for s in self.S:
+            cons=0
+            #add outgoing occupancy for available actions
+            for a in avail_actions[s]:
+                cons+=state_act_vars[s,a]
+
+            #add ingoing occupancy for predecessor state actions
+            for s_bar, a_bar in self.predecessors[s]:
+                #this if clause ensures that you dont double count reaching goal and failure
+                if not s_bar == self.s_g and not s_bar == self.s_fail:
+                    cons -= state_act_vars[s_bar, a_bar] * self.P[s_bar, a_bar, s]
+            #initial state occupancy
+            if s == self.s_i:
+                cons=cons-1
+
+            #sets occupancy constraints
+            linear_model.addConstr(cons==0)
+
+        # set up the objective
+        obj = 0
+        obj+= state_act_vars[self.s_g, 0] # Probability of reaching goal state
+
+        #set the objective, solve the problem
+        linear_model.setObjective(obj, GRB.MAXIMIZE)
+        linear_model.optimize()
+
+        if linear_model.SolCount == 0:
+            feasible_flag = False
+        else:
+            feasible_flag = True
+
+        if feasible_flag:
+            # Construct the policy from the occupancy variables
+            policy = np.zeros((self.N_S, self.N_A), dtype=np.float)
+            for s in self.S:
+                if len(self.avail_actions[s]) == 0:
+                    policy[s, :] = -1 # If no actions are available, return garbage value
+                else:
+                    occupancy_state = np.sum([state_act_vars[s,a].x for a in self.avail_actions[s]])
+                    # If the state has no occupancy measure under the solution, set the policy to
+                    # be uniform over available actions
+                    if occupancy_state == 0.0:
+                        for a in self.avail_actions[s]:
+                            policy[s,a] = 1 / len(self.avail_actions[s])
+                    if occupancy_state > 0.0:
+                        for a in self.avail_actions[s]:
+                            policy[s, a] = state_act_vars[s,a].x / occupancy_state
+        else:
+            policy = -1 * np.ones((self.N_S, self.N_A), dtype=np.float)
+
+        reach_prob = state_act_vars[self.s_g, 0].x
+
+        return policy, reach_prob, feasible_flag
+
+
     def solve_minimal_comms_vals(self, prob_threshold):
         """computes the minimum communication for a team of agents required to reach a goal state of an MDP given sampled success probabilities and a task completion probability constraint that must be satisficed
 
@@ -222,20 +313,11 @@ class HLMDP(object):
                         # only one of the completion_probs will be non-zero b/c of how the binary_decision_vars are constrained
                         binary_decision_var = model.getVarByName(f"binary_decision_var_{str(a_pred)}_{str(val_idx)}")
                         completion_prob = binary_decision_var * success_prob_vals[a_pred][val_idx]
-
                         constraint -= state_act_vars[s_pred, a_pred] * completion_prob
-                # pdb.set_trace()
-                # pred_constraint *= state_act_vars[s_pred, a_pred]
-                # constraint -= pred_constraint
+
             # define initial state occupancy
             if s == self.s_i:
                 constraint -= 1
-
-            #TODO remove once the model works as expected
-            # # add constraint to the model
-            # print(s)
-            # print(constraint)
-            # pdb.set_trace()
 
             model.addConstr(constraint == 0)
         model.update()
@@ -264,8 +346,12 @@ class HLMDP(object):
         chosen_success_probs = {}
 
         for a in self.A:
+            print(a)
             for val_idx in range(n_sampled_vals):
-                if binary_decision_vars[a, val_idx].x == 1:
+                # round binary_decision_vars to 1 to check this condition
+                ## Gurobi uses floating point numbers, so it might output a value like 0.9999915854839727 for binary_decision_vars which is supposed to only take values in {0, 1}. That means in the context of this variable, its value is actually 1
+                ## rounding to 3 digits is a magic number that I found works well for my use case (relatively small problems). It will likely break for other problems.
+                if round(binary_decision_vars[a, val_idx].x, 3) == 1:
                     chosen_idx[a] = val_idx
                     optimal_comms_vals[a] = comms_vals[a][val_idx]
                     chosen_success_probs[a] = success_prob_vals[a][val_idx]
@@ -274,8 +360,9 @@ class HLMDP(object):
 
         # round goal_reach_prob to 1 if it is supposed to be 1
         ## Gurobi likes to output numbers like 1.0000000000000004 b/c it uses floating point numbers
+        ## rounding to 3 digits is a magic number that I found works well for my use case (relatively small problems). It will likely break for other problems.
         if goal_reach_prob >= 1:
-            if (round(goal_reach_prob, 5) == 1.0):
+            if (round(goal_reach_prob, 3) == 1.0):
                 goal_reach_prob = 1.0
 
         # compute the policy from the model output
@@ -293,11 +380,7 @@ class HLMDP(object):
                     policy[s, :] = -1
                 else:
                     occupancy_state = np.sum([state_act_vars[s, a].x for a in self.avail_actions[s]])
-                    # set policy to uniform random over available actions if the optimization does not output an occupancy measure for this state
-                    #TODO this doesn't make sense. Why wouldn't the optimization output a policy for a given state?
-                    ## this breaks my stuff in the case of a simple 2-state transition with 3 actions, and success_prob given by f(x) = x for all tasks. Assigns equal probability to each action, which is WRONG
-
-                    # pdb.set_trace()
+                    # set policy to uniform random over available actions if the optimization does not output an occupancy measure for this state (i.e., the state is not visited under a policy which is optimal WRT the optimization problem )
                     if occupancy_state == 0.0:
                         for a in self.avail_actions[s]:
                             policy[s, a] = 1 / len(self.avail_actions[s])
@@ -311,12 +394,9 @@ class HLMDP(object):
 
         print("\n\n")
         print(f"Policy: \n{np.round(policy, 2)}\n")
-
-
         print(f"Communication values for subtask policies: {optimal_comms_vals}")
         print(f"Chosen success probabilities for subtask policies: {chosen_success_probs}")
         print(f"Goal reach probability: {goal_reach_prob}")
-        pdb.set_trace()
 
         return policy, optimal_comms_vals, chosen_success_probs, goal_reach_prob, feasible_flag
 

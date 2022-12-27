@@ -51,6 +51,7 @@ RUN pip3 install numpy==1.19.5
 RUN pip3 install scipy==1.5.4
 RUN pip3 install matplotlib
 RUN pip3 install pyyaml==3.13
+RUN pip3 install networkx==2.8.8
 
 RUN mkdir /install
 WORKDIR /install
