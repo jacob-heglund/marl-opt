@@ -80,7 +80,7 @@ class HLMDP(object):
         for s in self.S:
             self.avail_actions[s] = []
 
-        for controller_ind in self.controller_dict.keys():
+        for controller_ind in range(len(self.controller_dict.keys())):
             controller = self.controller_dict[controller_ind]
             controller_init_states = controller.get_init_states()
             init_s = self.state_list.index(controller_init_states)
@@ -88,7 +88,7 @@ class HLMDP(object):
 
     def _construct_avail_actions(self):
         for a in self.A:
-            self.avail_states[a]=[]
+            self.avail_states[a] = []
 
         for s in self.S:
             avail_actions = self.avail_actions[s]
@@ -149,7 +149,7 @@ class HLMDP(object):
         avail_actions = self.avail_actions.copy()
 
         #dummy action for goal state
-        avail_actions[self.s_g]=[0]
+        avail_actions[self.s_g] = [0]
 
         #create occupancy measures, probability variables and reward variables
         for s in self.S:
@@ -346,7 +346,6 @@ class HLMDP(object):
         chosen_success_probs = {}
 
         for a in self.A:
-            print(a)
             for val_idx in range(n_sampled_vals):
                 # round binary_decision_vars to 1 to check this condition
                 ## Gurobi uses floating point numbers, so it might output a value like 0.9999915854839727 for binary_decision_vars which is supposed to only take values in {0, 1}. That means in the context of this variable, its value is actually 1
@@ -391,12 +390,6 @@ class HLMDP(object):
         else:
             policy = -1 * np.ones((self.N_S, self.N_A), dtype=np.float)
             goal_reach_prob = -1
-
-        print("\n\n")
-        print(f"Policy: \n{np.round(policy, 2)}\n")
-        print(f"Communication values for subtask policies: {optimal_comms_vals}")
-        print(f"Chosen success probabilities for subtask policies: {chosen_success_probs}")
-        print(f"Goal reach probability: {goal_reach_prob}")
 
         return policy, optimal_comms_vals, chosen_success_probs, goal_reach_prob, feasible_flag
 

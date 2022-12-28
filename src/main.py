@@ -176,22 +176,22 @@ controller_dict[2] = SubtaskController(2, init_states=[0, 0], final_states=[1, 0
 """
 
 """
-#TODO implmenent this and make sure it works for some reasonable assumptions on the success function
 #TODO the transitions don't have the right init_states and final_states, but that is only something I will know after I actually implement the full labyrinth environment
-## for now, the init_states and final_states are shorthand, with the number in the first entry as the indices of the high-level states the edge is associated with
 
 scenario 5 - the multi-agent labyrinth as we will actually implement it
 includes "helper goals" to get the team between rooms easier and reduce the complexity of learning the policy
 """
+
 prob_threshold = 0.95
 init_states = [0, 0]
 final_states = [13, 0]
+
 
 state_action_transition_dict = {}
 
 state_action_transition_dict[0] = {
     "avail_actions": [0, 1],
-    "final_states": [1, 2]
+    "final_states": [1, 2],
     }
 
 state_action_transition_dict[1] = {
@@ -254,40 +254,12 @@ state_action_transition_dict[12] = {
     "final_states": [13]
     }
 
-G = nx.DiGraph()
-edge_labels = {}
-
+# populate controller dictionary
 for start_state in state_action_transition_dict:
-    G.add_node(start_state)
-
     for i in range(len(state_action_transition_dict[start_state]["avail_actions"])):
         action = state_action_transition_dict[start_state]["avail_actions"][i]
         final_state = state_action_transition_dict[start_state]["final_states"][i]
         controller_dict[action] = SubtaskController(action, init_states=[start_state, 0], final_states=[final_state, 0], success_function_idx=6)
-
-        edge_labels[(start_state, final_state)] = action
-
-
-        G.add_edge(start_state, final_state, action_idx=action)
-
-# draw the graph with networkx and matplotlib
-
-# this layout is pretty dope tbh
-## I tried a bunch of the other layouts and they don't look great for our graph
-## spectral is also kinda how I drew the graph in the first place, so I think it is a fairly intuitive way to display the graph
-# would be nice to roate it so 0 is at the top to mirror the actual layout of the labyrinth
-## but the final image in our paper will be made using tikz in latex anyways, so don't worry about it. This image is just for my own sanity check and to have an intermediate result.
-## in the final image, it should have the "subtask" labels, as well as the possibility of entering a failure state like the image in "Verifiable"
-
-pos = nx.spectral_layout(G)
-plt.figure()
-nx.draw(G, pos, labels={node: node for node in G.nodes()})
-nx.draw_networkx_edge_labels(G, pos, label_pos=0.65, edge_labels=edge_labels)
-plt.savefig("high_level_mdp.png")
-
-
-
-
 
 # ####################
 # # policies going out of u0
@@ -345,7 +317,6 @@ plt.savefig("high_level_mdp.png")
 #TODO once you have an optimal policy, it may make sense to "refine" the optimal policy so comms are minimized just for the states that can be visited under that policy
 
 
-
 # set up communication optimization problem
 hlmdp = HLMDP(init_states=init_states, goal_states=final_states, controller_dict=controller_dict)
 
@@ -355,28 +326,55 @@ hlmdp = HLMDP(init_states=init_states, goal_states=final_states, controller_dict
 policy, optimal_comms_vals, chosen_success_probs, goal_reach_prob, feasible_flag = hlmdp.solve_minimal_comms_vals(prob_threshold)
 
 
-"""
+#TODO visualize the state-transition graph and policy
+## is there a nice way to visualize the learned communication values and chosen success probabilities (transition function) too?
+
+# draw the graph with networkx and matplotlib
+# this layout is pretty dope tbh
+## I tried a bunch of the other layouts and they don't look great for our graph
+## spectral is also kinda how I drew the graph in the first place, so I think it is a fairly intuitive way to display the graph
+# would be nice to roate it so 0 is at the top to mirror the actual layout of the labyrinth
+## but the final image in our paper will be made using tikz in latex anyways, so don't worry about it. This image is just for my own sanity check and to have an intermediate result.
+## in the final image, it should have the "subtask" labels, as well as the possibility of entering a failure state like the image in "Verifiable"
+
+
+# init networkx graph for visualization
+G = nx.DiGraph()
+edge_labels = {}
+
+# populate edge data from the high-level MDP solution
+for start_state in hlmdp.S:
+    if (start_state != hlmdp.s_fail):
+        #TODO how to visualize the policy for each state?
+        ## not a priority, it will take more effort than it is worth right now
+        ### maybe color the outgoing edges of a state based on the probability of taking that action
+        ### or as a weight that is "above" the edge
+
+        G.add_node(start_state)
+
+        if (start_state != hlmdp.s_g):
+            for i in range(len(state_action_transition_dict[start_state]["avail_actions"])):
+                action = state_action_transition_dict[start_state]["avail_actions"][i]
+                final_state = state_action_transition_dict[start_state]["final_states"][i]
+
+                # only show the action index on the edges
+                edge_labels[(start_state, final_state)] = f"a: {action}"
+
+                # show a bunch on information on the edges (gets cut off b/c some edges are too short)
+                # edge_labels[(start_state, final_state)] = f"a: {action}, p: {chosen_success_probs[action]}, c: {optimal_comms_vals[action]}"
+
+                G.add_edge(start_state, final_state, action_idx=action, optimal_comms_val=optimal_comms_vals[action], chosen_success_prob=chosen_success_probs[action])
+
+pos = nx.spectral_layout(G)
+plt.figure()
+nx.draw(G, pos, labels={node: node for node in G.nodes()})
+nx.draw_networkx_edge_labels(G, pos, label_pos=0.65, edge_labels=edge_labels, rotate=False)
+plt.savefig("high_level_mdp.png")
+
 print("\n\n")
 print(f"Policy: \n{policy}\n")
-
-
-print(f"Communication values: {optimal_comms_vals}")
 print(f"Chosen success probabilities: {chosen_success_probs}")
+print(f"Communication values: {optimal_comms_vals}")
+print(f"Summed communication values: {sum(optimal_comms_vals.values())}")
 print(f"Goal reach probability: {goal_reach_prob}")
-pdb.set_trace()
-"""
-
-# plot success probability vs communication threshold
-# for controller_idx, controller in enumerate(controller_list):
-#     plt.plot(controller.communication_thresholds, controller.success_prob_list, label=f"Controller {controller_idx}")
-#     plt.xlabel("Communication threshold $\lambda_c$")
-#     plt.ylabel("Empirical subtask success probability $\hat{\sigma}_c$ ")
-#     plt.legend()
-#     plt.savefig("success_prob_list.png")
-
-# initialize high-level MDP
-
-
-
-# solve high-level MDP for minimal communication while meeting prob_threshold
 
