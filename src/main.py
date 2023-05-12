@@ -176,8 +176,7 @@ controller_dict[2] = SubtaskController(2, init_states=[0, 0], final_states=[1, 0
 """
 
 """
-#TODO the transitions don't have the right init_states and final_states, but that is only something I will know after I actually implement the full labyrinth environment
-
+#TODO implement this
 scenario 5 - the multi-agent labyrinth as we will actually implement it
 includes "helper goals" to get the team between rooms easier and reduce the complexity of learning the policy
 """
@@ -186,7 +185,7 @@ prob_threshold = 0.95
 init_states = [0, 0]
 final_states = [13, 0]
 
-
+#TODO I shouldn't have to manually specify all this stuff. Just the start state, end state, and transition condition
 state_action_transition_dict = {}
 
 state_action_transition_dict[0] = {
@@ -326,7 +325,8 @@ hlmdp = HLMDP(init_states=init_states, goal_states=final_states, controller_dict
 policy, optimal_comms_vals, chosen_success_probs, goal_reach_prob, feasible_flag = hlmdp.solve_minimal_comms_vals(prob_threshold)
 
 
-#TODO visualize the state-transition graph and policy
+# visualize the state-transition graph
+## would be nice to visualize the policy
 ## is there a nice way to visualize the learned communication values and chosen success probabilities (transition function) too?
 
 # draw the graph with networkx and matplotlib
