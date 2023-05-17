@@ -2,15 +2,18 @@ import numpy as np
 import pdb
 
 class SubtaskController():
-    def __init__(self, controller_idx, init_states, final_states, success_function_idx=0):
+    def __init__(self, controller_idx, init_states, final_states, success_function_idx=0, low_comms_success_prob=1.0, high_comms_success_prob=1.0):
         self.controller_idx = controller_idx
         self.init_states = init_states
         self.final_states = final_states
 
         self.success_function_idx = success_function_idx
+        self.low_comms_success_prob = low_comms_success_prob
+        self.high_comms_success_prob = high_comms_success_prob
+
 
         # values of communication threshold to be sampled
-        self.communication_thresholds = np.linspace(0.0, 1.0, num=11)
+        self.communication_thresholds = np.linspace(0.0, 1.0, num=4)
 
         # choose these functions y = f(x) such that y \in [0, 1] for x \in [0, 1]
         self.success_functions = {}
@@ -22,6 +25,7 @@ class SubtaskController():
         self.success_functions[4] = self.f_4
         self.success_functions[5] = self.f_5
         self.success_functions[6] = self.f_6
+        self.success_functions[7] = self.f_7
 
         # list of success probs at sampled points of f_c
         self.success_prob_list = self._sample_success_probability_function()
@@ -33,7 +37,11 @@ class SubtaskController():
     def _sample_success_probability_function(self):
         """generates samples from a simulated success probability function at different values of communication between agents
         """
-        success_vals = self.success_functions[self.success_function_idx](self.communication_thresholds)
+        #TODO this is a really dumb way to implement this
+        if self.success_function_idx == 7:
+            success_vals = self.success_functions[self.success_function_idx](self.communication_thresholds, self.low_comms_success_prob, self.high_comms_success_prob)
+        else:
+            success_vals = self.success_functions[self.success_function_idx](self.communication_thresholds)
         return success_vals
 
     def f_0(self, x):
@@ -57,6 +65,14 @@ class SubtaskController():
 
     def f_6(self, x):
         vals = [1.0 for i in range(len(x))]
+        return vals
+
+    def f_7(self, x, low_val, high_val):
+        # easier for 1 agent to complete
+        high_vals = [0.97 for i in range(int(len(x)/2))]
+        low_vals = [0.85 for i in range(int(len(x)/2))]
+
+        vals = high_vals + low_vals
         return vals
 
     def get_init_states(self):
