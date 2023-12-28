@@ -31,8 +31,6 @@ class HLMDP(object):
         self.s_fail = None
         self._construct_state_space()
 
-        pdb.set_trace()
-
         self.avail_actions = {}
         self.avail_states = {}
         self.A = self.controller_dict.keys()
@@ -76,7 +74,6 @@ class HLMDP(object):
         #TODO this way of constructing the state space is weird and bad. It shoudl be a dictionary, not a list.
         ## I should be able to specify the state and action indices in main.py (or a config file) and it will just take those and use them. I don't care about fancy self-constructing state spaces when I can't tell what the state indices are.
         ## I might have already solved this in the marl code, so don't worry about this too much for now
-        pdb.set_trace()
 
         self.S = np.arange(len(self.state_list))
 

@@ -13,11 +13,6 @@ import argparse
 
 parser = argparse.ArgumentParser(description=None)
 parser.add_argument('-s', '--success_rate', default=0.9, type=float, help="Success rate requirement")
-parser.add_argument('--low_comms_success_prob_1', default=0.9, type=float, help="Success rate for low comms")
-parser.add_argument('--high_comms_success_prob_1', default=0.9, type=float, help="Success rate for high comms")
-
-parser.add_argument('--low_comms_success_prob_2', default=0.9, type=float, help="Success rate for low comms")
-parser.add_argument('--high_comms_success_prob_2', default=0.9, type=float, help="Success rate for high comms")
 
 args = parser.parse_args()
 # initialize subtask controllers
@@ -31,6 +26,36 @@ includes "helper goals" to get the team between rooms easier and reduce the comp
 """
 
 success_prob_requirement = args.success_rate
+
+
+#TODO why define init and goal states in a list like this?
+init_states = [0, 0]
+goal_states = [2, 0]
+
+#TODO I shouldn't have to manually specify all this stuff. Just the start state, end state, and transition condition
+state_action_transition_dict = {}
+
+state_action_transition_dict[0] = {
+    "avail_actions": [0, 1],
+    "final_states": [1, 2],
+    }
+
+state_action_transition_dict[1] = {
+    "avail_actions": [2],
+    "final_states": [2]
+    }
+
+
+action_to_success_function_idx = {}
+action_to_success_function_idx[0] = 2
+action_to_success_function_idx[1] = 1
+action_to_success_function_idx[2] = 4
+
+# action_to_success_function_idx[3] = 4
+
+
+
+"""
 #TODO why define init and goal states in a list like this?
 init_states = [0, 0]
 goal_states = [11, 0]
@@ -93,6 +118,9 @@ state_action_transition_dict[10] = {
     "avail_actions": [11],
     "final_states": [11]
     }
+"""
+
+
 
 
 # populate controller dictionary
@@ -100,29 +128,15 @@ for start_state in state_action_transition_dict:
     for i in range(len(state_action_transition_dict[start_state]["avail_actions"])):
         action = state_action_transition_dict[start_state]["avail_actions"][i]
         final_state = state_action_transition_dict[start_state]["final_states"][i]
-        #TODO this isn't right, should be "if action in state_action_transition_dict[start_state]["avail_actions"]"
+
+        # create controllers for each subtask
 
         # navigation tasks always succeed regardless of comms level
-        if action in [0, 2, 4, 6, 7, 9, 11]:
-            success_function_idx = 6
-            controller_dict[action] = SubtaskController(action, init_states=[start_state, 0], final_states=[final_state, 0], success_function_idx=success_function_idx)
+        controller_dict[action] = SubtaskController(action,
+                                                    init_states=[start_state, 0],
+                                                    final_states=[final_state, 0],
+                                                    success_function_idx=action_to_success_function_idx[action])
 
-        # button-toggling tasks are mixed in comms level success
-        elif action in [1, 3, 5, 8, 10]:
-            success_function_idx = 7
-
-            if action in [1, 5, 8]:
-                controller_dict[action] = SubtaskController(action, init_states=[start_state, 0], final_states=[final_state, 0], success_function_idx=success_function_idx, low_comms_success_prob=args.low_comms_success_prob_1, high_comms_success_prob=args.high_comms_success_prob_1)
-
-            elif action in [3, 10]:
-                # interesting case: the values are relatively close, so you don't know a priori how the algorithm will trade off
-                low_comms_success_prob = args.low_comms_success_prob_2
-                high_comms_success_prob = args.low_comms_success_prob_2
-                controller_dict[action] = SubtaskController(action, init_states=[start_state, 0], final_states=[final_state, 0], success_function_idx=success_function_idx, low_comms_success_prob=args.low_comms_success_prob_2, high_comms_success_prob=args.low_comms_success_prob_2)
-
-
-
-# pdb.set_trace()
 # # populate controller dictionary
 # for start_state in state_action_transition_dict:
 #     for i in range(len(state_action_transition_dict[start_state]["avail_actions"])):
@@ -137,7 +151,6 @@ for start_state in state_action_transition_dict:
 hlmdp = HLMDP(init_states=init_states, goal_states=goal_states, controller_dict=controller_dict)
 policy, optimal_comms_vals, chosen_success_probs, goal_reach_prob, feasible_flag = hlmdp.solve_minimal_comms_vals(success_prob_requirement)
 
-
 # init networkx graph for visualization
 G = nx.DiGraph()
 edge_labels = {}
@@ -149,29 +162,44 @@ for start_state in hlmdp.S:
         ## not a priority, it will take more effort than it is worth right now
         ### maybe color the outgoing edges of a state based on the probability of taking that action
         ### or as a weight that is "above" the edge
-        print("If this is True, you fixed the bug:", hlmdp.s_g == 11)
-        pdb.set_trace()
 
         G.add_node(start_state)
 
         if (start_state != hlmdp.s_g):
             for i in range(len(state_action_transition_dict[start_state]["avail_actions"])):
+                print(i)
                 action = state_action_transition_dict[start_state]["avail_actions"][i]
                 final_state = state_action_transition_dict[start_state]["final_states"][i]
 
                 # only show the action index on the edges
-                edge_labels[(start_state, final_state)] = f"a: {action}"
+                # edge_labels[(start_state, final_state)] = f"a: {action}"
 
                 # show a bunch on information on the edges (gets cut off b/c some edges are too short)
-                # edge_labels[(start_state, final_state)] = f"a: {action}, p: {chosen_success_probs[action]}, c: {optimal_comms_vals[action]}"
+                str4 = "$\pi$"
+                str5 = f"({action}|{start_state}) = {round(policy[start_state, action], 3)}\n"
+                str1 = f"box: {action_to_success_function_idx[action]}\n$c_{action}^*$: {round(optimal_comms_vals[action], 3)}\n"
+                str2 = "$\hat{\sigma}$"
+                str3 = f"($c_{action}^*$) : {chosen_success_probs[action]}"
 
-                G.add_edge(start_state, final_state, action_idx=action, optimal_comms_val=optimal_comms_vals[action], chosen_success_prob=chosen_success_probs[action])
+                # pdb.set_trace()
+                edge_labels[(start_state, final_state)] = str4 + str5 + str1 + str2 + str3
+
+                # G.add_edge(start_state, final_state, action_idx=action, optimal_comms_val=optimal_comms_vals[action], chosen_success_prob=chosen_success_probs[action])
+
+                G.add_edge(start_state, final_state, action_idx=action)
 
 pos = nx.spectral_layout(G)
 plt.figure()
+plt.text(-0.9, 1.0, f"Specified Goal Reach Probability: {args.success_rate}")
+plt.text(-0.9, 0.9, f"Chosen Goal Reach Probability: {round(goal_reach_prob, 3)}")
+plt.text(-0.9, 0.8, f"Total Communication Cost: {round(sum(optimal_comms_vals.values()), 3)}")
+
 nx.draw(G, pos, labels={node: node for node in G.nodes()})
 nx.draw_networkx_edge_labels(G, pos, label_pos=0.65, edge_labels=edge_labels, rotate=False)
+
+
 plt.savefig("high_level_mdp.png")
+
 
 print("\n\n")
 print(f"Policy: \n{policy}\n")
