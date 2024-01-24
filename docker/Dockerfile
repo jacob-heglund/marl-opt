@@ -20,9 +20,10 @@
 #     python -m pip install gurobipy==${GRB_VERSION} && \
 #     rm -rf /var/lib/apt/lists/*
 
-FROM python:3.8 AS packagepython
+FROM python:3.11 AS packagepython
 
-ARG GRB_VERSION=9.5.2
+# ARG GRB_VERSION=9.5.2
+ARG GRB_VERSION=11.0.0
 
 LABEL vendor="Gurobi"
 LABEL version=${GRB_VERSION}
@@ -47,11 +48,9 @@ RUN pip3 install --upgrade pip
 
 # Python packages we use
 RUN pip3 install gurobipy==${GRB_VERSION}
-RUN pip3 install scipy==1.5.4
-RUN pip3 install matplotlib==3.5.3
-RUN pip3 install pyyaml==3.13
-RUN pip3 install networkx==2.8.8
-RUN pip3 install numpy==1.19.5
+RUN pip3 install matplotlib==3.8.2
+RUN pip3 install networkx==3.2.1
+RUN pip3 install numpy==1.26.3
 
 RUN mkdir /install
 WORKDIR /install

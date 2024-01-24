@@ -8,7 +8,6 @@ import pdb
 
 import argparse
 
-
 # TODO create experiment running framework (specify in bash files)
 
 parser = argparse.ArgumentParser(description=None)
@@ -18,12 +17,6 @@ args = parser.parse_args()
 # initialize subtask controllers
 controller_dict = {}
 
-
-"""
-#TODO implement this
-scenario 5 - the multi-agent labyrinth as we will actually implement it
-includes "helper goals" to get the team between rooms easier and reduce the complexity of learning the policy
-"""
 
 success_prob_requirement = args.success_rate
 
